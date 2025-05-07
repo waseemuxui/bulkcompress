@@ -12,14 +12,6 @@ import { ToolProgressIndicator } from "@/components/tool-progress-indicator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import dynamic from "next/dynamic"
 
-// Define types for FFmpeg
-type FFmpeg = {
-  load: () => Promise<void>
-  isLoaded: () => boolean
-  FS: (command: string, ...args: any[]) => any
-  run: (...args: string[]) => Promise<void>
-}
-
 interface CompressedFile {
   id: string
   name: string
@@ -38,24 +30,28 @@ const MP4CompressorClient = () => {
   const [resolution, setResolution] = useState("original")
   const [currentStep, setCurrentStep] = useState(1)
   const [ffmpegLoaded, setFfmpegLoaded] = useState(false)
-  const [ffmpeg, setFfmpeg] = useState<FFmpeg | null>(null)
-  const [fetchFile, setFetchFile] = useState<((file: File) => Promise<Uint8Array>) | null>(null)
+  const [ffmpegInstance, setFfmpegInstance] = useState<any>(null)
   const { toast } = useToast()
 
   useEffect(() => {
     // Dynamically import FFmpeg only on the client side
     const loadFFmpegLibrary = async () => {
       try {
-        const FFmpeg = await import("@ffmpeg/ffmpeg")
-        const ffmpegInstance = FFmpeg.createFFmpeg({
-          log: true,
-          corePath: "https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js",
-        })
-        setFfmpeg(ffmpegInstance)
-        setFetchFile(() => FFmpeg.fetchFile)
+        // Import the FFmpeg module
+        const { FFmpeg } = await import("@ffmpeg/ffmpeg")
 
-        await ffmpegInstance.load()
+        // Create a new FFmpeg instance
+        const ffmpeg = new FFmpeg()
+
+        // Load the FFmpeg core
+        await ffmpeg.load({
+          coreURL: "https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js",
+        })
+
+        setFfmpegInstance(ffmpeg)
         setFfmpegLoaded(true)
+
+        console.log("FFmpeg loaded successfully")
       } catch (error) {
         console.error("Error loading FFmpeg:", error)
         toast({
@@ -95,30 +91,33 @@ const MP4CompressorClient = () => {
   )
 
   const compressFiles = async () => {
-    if (files.length === 0 || !ffmpeg || !fetchFile) return
+    if (files.length === 0 || !ffmpegInstance) return
 
     setIsCompressing(true)
     setCurrentStep(3)
     const compressed: CompressedFile[] = []
 
     try {
+      // Import fetchFile dynamically
+      const { fetchFile } = await import("@ffmpeg/ffmpeg/dist/esm/utils")
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
-        const safeFileName = `input_${i}_${Date.now()}.${file.name.split(".").pop()}`
+        const safeFileName = `input_${i}_${Date.now()}.mp4`
 
         // Write the file to FFmpeg's virtual file system
-        ffmpeg.FS("writeFile", safeFileName, await fetchFile(file))
+        await ffmpegInstance.writeFile(safeFileName, await fetchFile(file))
 
         // Prepare FFmpeg command
         let scaleFilter = ""
         if (resolution !== "original") {
-          scaleFilter = `-vf scale=${resolution}`
+          scaleFilter = `scale=${resolution}`
         }
 
         const outputFileName = `output_${i}_${Date.now()}.mp4`
 
-        // Run FFmpeg command to compress the video
-        await ffmpeg.run(
+        // Prepare FFmpeg command
+        const ffmpegCommand = [
           "-i",
           safeFileName,
           "-c:v",
@@ -131,12 +130,21 @@ const MP4CompressorClient = () => {
           "aac",
           "-b:a",
           "128k",
-          ...(scaleFilter ? scaleFilter.split(" ") : []),
-          outputFileName,
-        )
+        ]
+
+        // Add scale filter if needed
+        if (scaleFilter) {
+          ffmpegCommand.push("-vf", scaleFilter)
+        }
+
+        // Add output filename
+        ffmpegCommand.push(outputFileName)
+
+        // Run FFmpeg command to compress the video
+        await ffmpegInstance.exec(ffmpegCommand)
 
         // Read the compressed file from FFmpeg's virtual file system
-        const data = ffmpeg.FS("readFile", outputFileName)
+        const data = await ffmpegInstance.readFile(outputFileName)
 
         // Create a Blob from the compressed file data
         const blob = new Blob([data.buffer], { type: "video/mp4" })
@@ -154,8 +162,8 @@ const MP4CompressorClient = () => {
         })
 
         // Clean up FFmpeg's virtual file system
-        ffmpeg.FS("unlink", safeFileName)
-        ffmpeg.FS("unlink", outputFileName)
+        await ffmpegInstance.deleteFile(safeFileName)
+        await ffmpegInstance.deleteFile(outputFileName)
       }
 
       setCompressedFiles(compressed)
@@ -246,7 +254,7 @@ const MP4CompressorClient = () => {
                     Loading...
                   </>
                 ) : (
-                  "Compress MP4"
+                  "Compress MP4 Files"
                 )}
               </Button>
             </div>
