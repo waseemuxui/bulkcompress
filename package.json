@@ -61,8 +61,7 @@
     "pdf-lib": "latest",
     "jszip": "latest",
     "browser-image-compression": "latest",
-    "gifuct-js": "latest",
-    "@ffmpeg/ffmpeg": "latest"
+    "gifuct-js": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

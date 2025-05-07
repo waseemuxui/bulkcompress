@@ -32,14 +32,6 @@ export function ToolsNavigation({ onClick }: ToolsNavigationProps) {
       ],
     },
     {
-      category: "Video",
-      type: "video",
-      items: [
-        { name: "Video Compressor", href: "/tools/video/video-compressor", type: "video" },
-        { name: "MP4 Compressor", href: "/tools/video/mp4-compressor", type: "mp4" },
-      ],
-    },
-    {
       category: "Audio",
       type: "audio",
       items: [{ name: "Audio Compressor", href: "/tools/audio/audio-compressor", type: "audio" }],

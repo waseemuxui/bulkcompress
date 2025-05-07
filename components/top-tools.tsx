@@ -47,15 +47,6 @@ export function TopTools() {
       popular: true,
     },
     {
-      id: "mp4-compressor",
-      name: "MP4 Compressor",
-      description: "Compress MP4 videos with quality control",
-      href: "/tools/video/mp4-compressor",
-      type: "mp4",
-      category: "video",
-      popular: true,
-    },
-    {
       id: "audio-compressor",
       name: "Audio Compressor",
       description: "Compress audio files while preserving quality",

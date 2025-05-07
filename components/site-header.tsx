@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { FileArchive, FileImage, FileText, FileVideo, Menu, Music, Share2, X } from "lucide-react"
+import { FileArchive, FileImage, FileText, Menu, Music, Share2, X } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
@@ -27,12 +27,6 @@ export function SiteHeader() {
       label: "Documents",
       icon: FileText,
       active: pathname.includes("/tools/document"),
-    },
-    {
-      href: "/tools/video/video-compressor",
-      label: "Videos",
-      icon: FileVideo,
-      active: pathname.includes("/tools/video"),
     },
     {
       href: "/tools/audio/audio-compressor",

@@ -39,23 +39,6 @@ const tools = [
     ],
   },
   {
-    category: "Video Compression",
-    items: [
-      {
-        name: "Video Compressor",
-        description: "Compress multiple video formats at once",
-        href: "/tools/video/video-compressor",
-        type: "video",
-      },
-      {
-        name: "MP4 Compressor",
-        description: "Compress MP4 videos with quality control",
-        href: "/tools/video/mp4-compressor",
-        type: "mp4",
-      },
-    ],
-  },
-  {
     category: "Audio Compression",
     items: [
       {

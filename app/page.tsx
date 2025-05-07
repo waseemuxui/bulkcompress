@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { FileImage, FileText, FileVideo, Music, FileArchive } from "lucide-react"
+import { FileImage, FileText, Music, FileArchive } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { HeroSection } from "@/components/hero-section"
@@ -43,12 +43,6 @@ export default function HomePage() {
               icon: FileImage,
             },
             {
-              title: "Video Compression",
-              description: "Compress MP4, MOV, AVI and other video formats",
-              href: "/tools/video/video-compressor",
-              icon: FileVideo,
-            },
-            {
               title: "Audio Compression",
               description: "Compress MP3, WAV and other audio formats",
               href: "/tools/audio/audio-compressor",
@@ -83,6 +77,12 @@ export default function HomePage() {
               description: "Compress PDF files while maintaining quality",
               href: "/tools/document/pdf-compressor",
               icon: FileText,
+            },
+            {
+              title: "WebP Compression",
+              description: "Compress WebP images for optimal web performance",
+              href: "/tools/image/webp-compressor",
+              icon: FileImage,
             },
           ].map((tool) => (
             <div
