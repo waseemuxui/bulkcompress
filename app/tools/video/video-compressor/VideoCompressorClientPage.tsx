@@ -10,7 +10,15 @@ import { Loader2 } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { ToolProgressIndicator } from "@/components/tool-progress-indicator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { createFFmpeg, fetchFile } from "@ffmpeg/ffmpeg"
+import dynamic from "next/dynamic"
+
+// Define types for FFmpeg
+type FFmpeg = {
+  load: () => Promise<void>
+  isLoaded: () => boolean
+  FS: (command: string, ...args: any[]) => any
+  run: (...args: string[]) => Promise<void>
+}
 
 interface CompressedFile {
   id: string
@@ -21,7 +29,8 @@ interface CompressedFile {
   type: string
 }
 
-export function VideoCompressorClientPage() {
+// Create a client-side only component
+const VideoCompressorClient = () => {
   const [files, setFiles] = useState<File[]>([])
   const [compressedFiles, setCompressedFiles] = useState<CompressedFile[]>([])
   const [isCompressing, setIsCompressing] = useState(false)
@@ -29,21 +38,24 @@ export function VideoCompressorClientPage() {
   const [resolution, setResolution] = useState("original")
   const [currentStep, setCurrentStep] = useState(1)
   const [ffmpegLoaded, setFfmpegLoaded] = useState(false)
+  const [ffmpeg, setFfmpeg] = useState<FFmpeg | null>(null)
+  const [fetchFile, setFetchFile] = useState<((file: File) => Promise<Uint8Array>) | null>(null)
   const { toast } = useToast()
 
-  const ffmpeg = createFFmpeg({
-    log: true,
-    corePath: "https://unpkg.com/@ffmpeg/core@0.10.0/dist/ffmpeg-core.js",
-  })
-
   useEffect(() => {
-    // Load FFmpeg on component mount
-    const loadFFmpeg = async () => {
+    // Dynamically import FFmpeg only on the client side
+    const loadFFmpegLibrary = async () => {
       try {
-        if (!ffmpeg.isLoaded()) {
-          await ffmpeg.load()
-          setFfmpegLoaded(true)
-        }
+        const FFmpeg = await import("@ffmpeg/ffmpeg")
+        const ffmpegInstance = FFmpeg.createFFmpeg({
+          log: true,
+          corePath: "https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js",
+        })
+        setFfmpeg(ffmpegInstance)
+        setFetchFile(() => FFmpeg.fetchFile)
+
+        await ffmpegInstance.load()
+        setFfmpegLoaded(true)
       } catch (error) {
         console.error("Error loading FFmpeg:", error)
         toast({
@@ -54,14 +66,7 @@ export function VideoCompressorClientPage() {
       }
     }
 
-    loadFFmpeg()
-
-    // Cleanup function
-    return () => {
-      if (ffmpeg.isLoaded()) {
-        // Clean up any resources if needed
-      }
-    }
+    loadFFmpegLibrary()
   }, [toast])
 
   const handleFilesSelected = useCallback(
@@ -94,19 +99,13 @@ export function VideoCompressorClientPage() {
   )
 
   const compressFiles = async () => {
-    if (files.length === 0) return
+    if (files.length === 0 || !ffmpeg || !fetchFile) return
 
     setIsCompressing(true)
     setCurrentStep(3)
     const compressed: CompressedFile[] = []
 
     try {
-      // Ensure FFmpeg is loaded
-      if (!ffmpeg.isLoaded()) {
-        await ffmpeg.load()
-        setFfmpegLoaded(true)
-      }
-
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
         const safeFileName = `input_${i}_${Date.now()}.${file.name.split(".").pop()}`
@@ -273,3 +272,8 @@ export function VideoCompressorClientPage() {
     </div>
   )
 }
+
+// Use dynamic import with SSR disabled for the client component
+export const VideoCompressorClientPage = dynamic(() => Promise.resolve(VideoCompressorClient), {
+  ssr: false,
+})

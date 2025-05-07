@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { FileUploader } from "@/components/file-uploader"
 import { CompressedFilesList } from "@/components/compressed-files-list"
 import { Slider } from "@/components/ui/slider"
@@ -8,8 +8,17 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
+import { ToolProgressIndicator } from "@/components/tool-progress-indicator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { createFFmpeg, fetchFile } from "@ffmpeg/ffmpeg"
+import dynamic from "next/dynamic"
+
+// Define types for FFmpeg
+type FFmpeg = {
+  load: () => Promise<void>
+  isLoaded: () => boolean
+  FS: (command: string, ...args: any[]) => any
+  run: (...args: string[]) => Promise<void>
+}
 
 interface CompressedFile {
   id: string
@@ -20,51 +29,85 @@ interface CompressedFile {
   type: string
 }
 
-export function MP4CompressorClientPage() {
+// Create a client-side only component
+const MP4CompressorClient = () => {
   const [files, setFiles] = useState<File[]>([])
   const [compressedFiles, setCompressedFiles] = useState<CompressedFile[]>([])
   const [isCompressing, setIsCompressing] = useState(false)
   const [quality, setQuality] = useState(28) // CRF value (lower is better quality)
   const [resolution, setResolution] = useState("original")
+  const [currentStep, setCurrentStep] = useState(1)
+  const [ffmpegLoaded, setFfmpegLoaded] = useState(false)
+  const [ffmpeg, setFfmpeg] = useState<FFmpeg | null>(null)
+  const [fetchFile, setFetchFile] = useState<((file: File) => Promise<Uint8Array>) | null>(null)
   const { toast } = useToast()
 
-  const ffmpeg = createFFmpeg({
-    log: true,
-    corePath: "https://unpkg.com/@ffmpeg/core@0.10.0/dist/ffmpeg-core.js",
-  })
+  useEffect(() => {
+    // Dynamically import FFmpeg only on the client side
+    const loadFFmpegLibrary = async () => {
+      try {
+        const FFmpeg = await import("@ffmpeg/ffmpeg")
+        const ffmpegInstance = FFmpeg.createFFmpeg({
+          log: true,
+          corePath: "https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js",
+        })
+        setFfmpeg(ffmpegInstance)
+        setFetchFile(() => FFmpeg.fetchFile)
 
-  const handleFilesSelected = (selectedFiles: File[]) => {
-    // Filter only MP4 files
-    const mp4Files = selectedFiles.filter(
-      (file) => file.type === "video/mp4" || file.name.toLowerCase().endsWith(".mp4"),
-    )
-
-    if (mp4Files.length < selectedFiles.length) {
-      toast({
-        title: "Unsupported file type",
-        description: "Only MP4 files are supported for this tool.",
-        variant: "destructive",
-      })
+        await ffmpegInstance.load()
+        setFfmpegLoaded(true)
+      } catch (error) {
+        console.error("Error loading FFmpeg:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load video compression library. Please try again later.",
+          variant: "destructive",
+        })
+      }
     }
 
-    setFiles(mp4Files)
-  }
+    loadFFmpegLibrary()
+  }, [toast])
+
+  const handleFilesSelected = useCallback(
+    (selectedFiles: File[]) => {
+      // Filter only MP4 files
+      const mp4Files = selectedFiles.filter(
+        (file) => file.type === "video/mp4" || file.name.toLowerCase().endsWith(".mp4"),
+      )
+
+      if (mp4Files.length < selectedFiles.length) {
+        toast({
+          title: "Unsupported file type",
+          description: "Only MP4 files are supported for this tool.",
+          variant: "destructive",
+        })
+      }
+
+      setFiles(mp4Files)
+
+      // Only update step if we have files
+      if (mp4Files.length > 0) {
+        setCurrentStep(2)
+      }
+    },
+    [toast],
+  )
 
   const compressFiles = async () => {
-    if (files.length === 0) return
+    if (files.length === 0 || !ffmpeg || !fetchFile) return
 
     setIsCompressing(true)
+    setCurrentStep(3)
     const compressed: CompressedFile[] = []
 
     try {
-      // Load FFmpeg if not already loaded
-      if (!ffmpeg.isLoaded()) {
-        await ffmpeg.load()
-      }
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        const safeFileName = `input_${i}_${Date.now()}.${file.name.split(".").pop()}`
 
-      for (const file of files) {
         // Write the file to FFmpeg's virtual file system
-        ffmpeg.FS("writeFile", file.name, await fetchFile(file))
+        ffmpeg.FS("writeFile", safeFileName, await fetchFile(file))
 
         // Prepare FFmpeg command
         let scaleFilter = ""
@@ -72,10 +115,12 @@ export function MP4CompressorClientPage() {
           scaleFilter = `-vf scale=${resolution}`
         }
 
+        const outputFileName = `output_${i}_${Date.now()}.mp4`
+
         // Run FFmpeg command to compress the video
         await ffmpeg.run(
           "-i",
-          file.name,
+          safeFileName,
           "-c:v",
           "libx264",
           "-crf",
@@ -87,11 +132,11 @@ export function MP4CompressorClientPage() {
           "-b:a",
           "128k",
           ...(scaleFilter ? scaleFilter.split(" ") : []),
-          "output.mp4",
+          outputFileName,
         )
 
         // Read the compressed file from FFmpeg's virtual file system
-        const data = ffmpeg.FS("readFile", "output.mp4")
+        const data = ffmpeg.FS("readFile", outputFileName)
 
         // Create a Blob from the compressed file data
         const blob = new Blob([data.buffer], { type: "video/mp4" })
@@ -109,11 +154,12 @@ export function MP4CompressorClientPage() {
         })
 
         // Clean up FFmpeg's virtual file system
-        ffmpeg.FS("unlink", file.name)
-        ffmpeg.FS("unlink", "output.mp4")
+        ffmpeg.FS("unlink", safeFileName)
+        ffmpeg.FS("unlink", outputFileName)
       }
 
       setCompressedFiles(compressed)
+      setCurrentStep(4)
       toast({
         title: "Compression complete",
         description: `Successfully compressed ${compressed.length} files.`,
@@ -135,69 +181,87 @@ export function MP4CompressorClientPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="grid gap-8 md:grid-cols-2">
-        <div>
-          <div className="mb-6 space-y-4">
-            <div>
-              <Label htmlFor="quality" className="mb-2 block">
-                Quality: {quality} CRF
-              </Label>
-              <Slider
-                id="quality"
-                min={18}
-                max={40}
-                step={1}
-                value={[quality]}
-                onValueChange={(value) => setQuality(value[0])}
-                className="mb-2"
-              />
-              <p className="text-xs text-muted-foreground">
-                Lower CRF = higher quality, larger file size (18-28 is visually lossless)
-              </p>
+    <div className="space-y-8 flex flex-col items-center">
+      <div className="w-full max-w-4xl">
+        <ToolProgressIndicator currentStep={currentStep} totalSteps={4} />
+
+        <div className="grid gap-8 md:grid-cols-2">
+          <div>
+            <div className="mb-6 space-y-4">
+              <div>
+                <Label htmlFor="quality" className="mb-2 block">
+                  Quality: {quality} CRF
+                </Label>
+                <Slider
+                  id="quality"
+                  min={18}
+                  max={40}
+                  step={1}
+                  value={[quality]}
+                  onValueChange={(value) => setQuality(value[0])}
+                  className="mb-2"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Lower CRF = higher quality, larger file size (18-28 is visually lossless)
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="resolution" className="mb-2 block">
+                  Resolution
+                </Label>
+                <Select value={resolution} onValueChange={setResolution}>
+                  <SelectTrigger id="resolution" className="w-full">
+                    <SelectValue placeholder="Select resolution" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="original">Original Resolution</SelectItem>
+                    <SelectItem value="-1:720">720p</SelectItem>
+                    <SelectItem value="-1:480">480p</SelectItem>
+                    <SelectItem value="-1:360">360p</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Lower resolution = smaller file size, but lower quality
+                </p>
+              </div>
             </div>
 
-            <div>
-              <Label htmlFor="resolution" className="mb-2 block">
-                Resolution
-              </Label>
-              <Select value={resolution} onValueChange={setResolution}>
-                <SelectTrigger id="resolution" className="w-full">
-                  <SelectValue placeholder="Select resolution" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="original">Original Resolution</SelectItem>
-                  <SelectItem value="-1:720">720p</SelectItem>
-                  <SelectItem value="-1:480">480p</SelectItem>
-                  <SelectItem value="-1:360">360p</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-2">
-                Lower resolution = smaller file size, but lower quality
-              </p>
+            <FileUploader onFilesSelected={handleFilesSelected} accept="video/mp4,.mp4" multiple={true} maxSize={100} />
+
+            <div className="mt-4 flex justify-center">
+              <Button
+                onClick={compressFiles}
+                disabled={files.length === 0 || isCompressing || !ffmpegLoaded}
+                className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#6366F1] to-[#EC4899] px-8 py-3 text-base font-medium text-white transition-all duration-200 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#6366F1] focus:ring-offset-2 shadow-lg shadow-[#6366F1]/20"
+              >
+                {isCompressing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Compressing...
+                  </>
+                ) : !ffmpegLoaded ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  "Compress MP4"
+                )}
+              </Button>
             </div>
           </div>
 
-          <FileUploader onFilesSelected={handleFilesSelected} accept="video/mp4,.mp4" multiple={true} maxSize={100} />
-
-          <div className="mt-4 flex justify-center">
-            <Button onClick={compressFiles} disabled={files.length === 0 || isCompressing} className="w-full md:w-auto">
-              {isCompressing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Compressing...
-                </>
-              ) : (
-                "Compress MP4"
-              )}
-            </Button>
+          <div>
+            <CompressedFilesList files={compressedFiles} onDelete={handleDeleteFile} toolName="MP4 Compressor" />
           </div>
-        </div>
-
-        <div>
-          <CompressedFilesList files={compressedFiles} onDelete={handleDeleteFile} toolName="MP4 Compressor" />
         </div>
       </div>
     </div>
   )
 }
+
+// Use dynamic import with SSR disabled for the client component
+export const MP4CompressorClientPage = dynamic(() => Promise.resolve(MP4CompressorClient), {
+  ssr: false,
+})

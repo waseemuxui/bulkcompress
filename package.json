@@ -60,9 +60,9 @@
     "zod": "^3.24.1",
     "pdf-lib": "latest",
     "jszip": "latest",
-    "@ffmpeg/ffmpeg": "latest",
     "browser-image-compression": "latest",
-    "gifuct-js": "latest"
+    "gifuct-js": "latest",
+    "@ffmpeg/ffmpeg": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
