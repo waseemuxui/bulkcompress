@@ -1,0 +1,175 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 226 70% 55.5%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 226 70% 55.5%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 226 70% 55.5%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Gradient background */
+.gradient-bg {
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.8) 0%, rgba(240, 240, 255, 0.8) 100%);
+}
+
+.dark .gradient-bg {
+  background: radial-gradient(circle at 50% 50%, rgba(30, 30, 60, 0.8) 0%, rgba(10, 10, 30, 0.8) 100%);
+}
+
+/* Gradient text */
+.gradient-text {
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  background-image: linear-gradient(to right, #6366f1, #ec4899);
+}
+
+/* Uploader styles */
+.uploader-container {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.1) 100%);
+  backdrop-filter: blur(10px);
+  border: 1px dashed rgba(130, 130, 255, 0.3);
+  border-radius: 1rem;
+}
+
+.dark .uploader-container {
+  background: linear-gradient(135deg, rgba(30, 30, 60, 0.4) 0%, rgba(30, 30, 60, 0.1) 100%);
+  border: 1px dashed rgba(130, 130, 255, 0.3);
+}
+
+/* Feature badge */
+.feature-badge {
+  @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.4) 100%);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dark .feature-badge {
+  background: linear-gradient(135deg, rgba(30, 30, 60, 0.8) 0%, rgba(30, 30, 60, 0.4) 100%);
+  border: 1px solid rgba(60, 60, 90, 0.2);
+}
+
+/* Dot pattern */
+.dot-pattern {
+  background-image: radial-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.dark .dot-pattern {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+}
+
+/* Glow effect */
+.glow {
+  position: relative;
+}
+
+.glow::after {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+  background: radial-gradient(circle at center, rgba(99, 102, 241, 0.2) 0%, transparent 70%);
+  z-index: -1;
+  border-radius: inherit;
+}
+
+/* Testimonial card */
+.testimonial-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.4) 100%);
+  backdrop-filter: blur(10px);
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: transform 0.3s ease;
+}
+
+.testimonial-card:hover {
+  transform: translateY(-5px);
+}
+
+.dark .testimonial-card {
+  background: linear-gradient(135deg, rgba(30, 30, 60, 0.8) 0%, rgba(30, 30, 60, 0.4) 100%);
+  border: 1px solid rgba(60, 60, 90, 0.2);
+}
+
+/* Tool progress indicator */
+.tool-progress-step {
+  position: relative;
+}
+
+.tool-progress-step::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: calc(50% + 15px);
+  width: calc(100% - 30px);
+  height: 2px;
+  background-color: #e5e7eb;
+  transform: translateY(-50%);
+}
+
+.tool-progress-step:last-child::after {
+  display: none;
+}
+
+.tool-progress-step.active::after {
+  background-color: #6366f1;
+}
+
+.tool-progress-step.completed::after {
+  background-color: #6366f1;
+}
