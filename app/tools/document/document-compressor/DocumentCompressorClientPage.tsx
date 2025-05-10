@@ -1,22 +1,16 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState } from "react"
 import { FileUploader } from "@/components/file-uploader"
 import { CompressedFilesList } from "@/components/compressed-files-list"
-import { Slider } from "@/components/ui/slider"
-import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { Loader2 } from "lucide-react"
+import { Slider } from "@/components/ui/slider"
 import { useToast } from "@/components/ui/use-toast"
+import { Card, CardContent } from "@/components/ui/card"
 import { ToolProgressIndicator } from "@/components/tool-progress-indicator"
-import { Switch } from "@/components/ui/switch"
-
-// Import libraries for document compression
-import { PDFDocument } from "pdf-lib"
 import JSZip from "jszip"
 
 interface CompressedFile {
-  id: string
   name: string
   originalSize: number
   compressedSize: number
@@ -24,154 +18,105 @@ interface CompressedFile {
   type: string
 }
 
-export function DocumentCompressorClientPage() {
+export default function DocumentCompressorClientPage() {
   const [files, setFiles] = useState<File[]>([])
   const [compressedFiles, setCompressedFiles] = useState<CompressedFile[]>([])
   const [isCompressing, setIsCompressing] = useState(false)
-  const [quality, setQuality] = useState(80)
-  const [compressionLevel, setCompressionLevel] = useState(6)
-  const [optimizeImages, setOptimizeImages] = useState(true)
-  const [currentStep, setCurrentStep] = useState(1)
+  const [compressionLevel, setCompressionLevel] = useState([50])
   const { toast } = useToast()
 
-  const handleFilesSelected = useCallback(
-    (selectedFiles: File[]) => {
-      // Filter only document files
-      const documentFiles = selectedFiles.filter(
-        (file) =>
-          file.type === "application/pdf" ||
-          file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-          file.type === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
-          file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-          file.name.toLowerCase().endsWith(".pdf") ||
-          file.name.toLowerCase().endsWith(".docx") ||
-          file.name.toLowerCase().endsWith(".pptx") ||
-          file.name.toLowerCase().endsWith(".xlsx"),
+  const handleFilesSelected = (selectedFiles: File[]) => {
+    // Filter for document files
+    const documentFiles = selectedFiles.filter((file) => {
+      const type = file.type.toLowerCase()
+      return (
+        type.includes("pdf") ||
+        type.includes("word") ||
+        type.includes("document") ||
+        type.includes("presentation") ||
+        type.includes("spreadsheet") ||
+        type.includes("msword") ||
+        type.includes("officedocument") ||
+        file.name.endsWith(".pdf") ||
+        file.name.endsWith(".doc") ||
+        file.name.endsWith(".docx") ||
+        file.name.endsWith(".ppt") ||
+        file.name.endsWith(".pptx") ||
+        file.name.endsWith(".xls") ||
+        file.name.endsWith(".xlsx") ||
+        file.name.endsWith(".odt") ||
+        file.name.endsWith(".odp") ||
+        file.name.endsWith(".ods")
       )
+    })
 
-      if (documentFiles.length < selectedFiles.length) {
-        toast({
-          title: "Unsupported file type",
-          description: "Only PDF, DOCX, PPTX, and XLSX files are supported for this tool.",
-          variant: "destructive",
-        })
-      }
+    if (documentFiles.length === 0) {
+      toast({
+        title: "Invalid files",
+        description: "Please upload document files (PDF, DOCX, PPTX, etc.)",
+        variant: "destructive",
+      })
+      return
+    }
 
-      setFiles(documentFiles)
+    setFiles(documentFiles)
+  }
 
-      // Only update step if we have files
-      if (documentFiles.length > 0) {
-        setCurrentStep(2)
-      }
-    },
-    [toast],
-  )
-
-  const compressFiles = async () => {
+  const compressDocuments = async () => {
     if (files.length === 0) return
 
     setIsCompressing(true)
-    setCurrentStep(3)
     const compressed: CompressedFile[] = []
 
     try {
+      // Process each file
       for (const file of files) {
-        let compressedBlob: Blob
-        let url: string
+        const originalSize = file.size
 
-        // Determine file type and apply appropriate compression
-        if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-          // Compress PDF
-          const fileArrayBuffer = await file.arrayBuffer()
-          const pdfDoc = await PDFDocument.load(fileArrayBuffer)
+        // Read the file
+        const arrayBuffer = await file.arrayBuffer()
 
-          const compressedPdfBytes = await pdfDoc.save({
-            useObjectStreams: true,
-            updateMetadata: true,
-          })
+        // Create a new JSZip instance
+        const zip = new JSZip()
 
-          compressedBlob = new Blob([compressedPdfBytes], { type: "application/pdf" })
-          url = URL.createObjectURL(compressedBlob)
-        } else if (
-          file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-          file.name.toLowerCase().endsWith(".docx") ||
-          file.type === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
-          file.name.toLowerCase().endsWith(".pptx") ||
-          file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-          file.name.toLowerCase().endsWith(".xlsx")
-        ) {
-          // Compress Office documents (DOCX, PPTX, XLSX)
-          const fileArrayBuffer = await file.arrayBuffer()
+        // Add the file to the zip
+        zip.file(file.name, arrayBuffer)
 
-          // Load the Office document (which is a ZIP archive)
-          const zip = new JSZip()
-          const loadedZip = await zip.loadAsync(fileArrayBuffer)
-
-          // Create a new ZIP with higher compression
-          const newZip = new JSZip()
-
-          // Process each file in the Office document
-          for (const [path, zipEntry] of Object.entries(loadedZip.files)) {
-            if (!zipEntry.dir) {
-              // Apply special handling for images if optimizeImages is true
-              if (optimizeImages && (path.includes("media/") || path.includes("image"))) {
-                const content = await zipEntry.async("arraybuffer")
-                newZip.file(path, content, {
-                  compression: "DEFLATE",
-                  compressionOptions: {
-                    level: 9, // Maximum compression for images
-                  },
-                })
-              } else {
-                const content = await zipEntry.async("arraybuffer")
-                newZip.file(path, content, {
-                  compression: "DEFLATE",
-                  compressionOptions: {
-                    level: compressionLevel,
-                  },
-                })
-              }
-            } else {
-              newZip.folder(path)
-            }
-          }
-
-          // Generate the compressed Office document
-          compressedBlob = await newZip.generateAsync({
-            type: "blob",
-            compression: "DEFLATE",
-            compressionOptions: {
-              level: compressionLevel,
-            },
-          })
-
-          url = URL.createObjectURL(compressedBlob)
-        } else {
-          // Unsupported file type
-          continue
+        // Generate the zip with compression level based on slider
+        const compressionOptions = {
+          compression: "DEFLATE",
+          compressionOptions: {
+            level: compressionLevel[0] / 10, // Convert to 0-9 scale
+          },
         }
 
+        const compressedBlob = await zip.generateAsync({
+          type: "blob",
+          ...compressionOptions,
+        })
+
+        // Create URL for the compressed file
+        const url = URL.createObjectURL(compressedBlob)
+
         compressed.push({
-          id: Math.random().toString(36).substring(2, 9),
           name: file.name,
-          originalSize: file.size,
+          originalSize,
           compressedSize: compressedBlob.size,
           url,
-          type: file.type || "application/octet-stream",
+          type: file.type,
         })
       }
 
       setCompressedFiles(compressed)
-      setCurrentStep(4)
       toast({
         title: "Compression complete",
-        description: `Successfully compressed ${compressed.length} files.`,
+        description: `Successfully compressed ${compressed.length} document${compressed.length !== 1 ? "s" : ""}`,
       })
     } catch (error) {
-      console.error("Error compressing files:", error)
+      console.error("Error compressing documents:", error)
       toast({
         title: "Compression failed",
-        description: "An error occurred while compressing your files.",
+        description: "An error occurred while compressing your documents",
         variant: "destructive",
       })
     } finally {
@@ -179,87 +124,65 @@ export function DocumentCompressorClientPage() {
     }
   }
 
-  const handleDeleteFile = (id: string) => {
-    setCompressedFiles((prev) => prev.filter((file) => file.id !== id))
+  const clearAll = () => {
+    // Revoke object URLs to prevent memory leaks
+    compressedFiles.forEach((file) => URL.revokeObjectURL(file.url))
+    setFiles([])
+    setCompressedFiles([])
   }
 
   return (
-    <div className="space-y-8">
-      <ToolProgressIndicator currentStep={currentStep} totalSteps={4} />
-
-      <div className="grid gap-8 md:grid-cols-2">
-        <div>
-          <div className="mb-6 space-y-4">
-            <div>
-              <Label htmlFor="quality" className="mb-2 block">
-                Quality: {quality}%
-              </Label>
-              <Slider
-                id="quality"
-                min={10}
-                max={100}
-                step={1}
-                value={[quality]}
-                onValueChange={(value) => setQuality(value[0])}
-                className="mb-2"
-              />
-              <p className="text-xs text-muted-foreground">
-                Lower quality = smaller file size, higher quality = better document quality
-              </p>
-            </div>
-
-            <div>
-              <Label htmlFor="compression-level" className="mb-2 block">
-                Compression Level: {compressionLevel}
-              </Label>
-              <Slider
-                id="compression-level"
-                min={1}
-                max={9}
-                step={1}
-                value={[compressionLevel]}
-                onValueChange={(value) => setCompressionLevel(value[0])}
-                className="mb-2"
-              />
-              <p className="text-xs text-muted-foreground">
-                Higher compression level = smaller file size, but slower compression
-              </p>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Switch id="optimize-images" checked={optimizeImages} onCheckedChange={setOptimizeImages} />
-              <Label htmlFor="optimize-images">Optimize embedded images</Label>
-            </div>
-          </div>
-
+    <div className="space-y-6">
+      <Card>
+        <CardContent className="p-6">
           <FileUploader
+            accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.odt,.odp,.ods"
+            maxFiles={10}
+            maxSize={50 * 1024 * 1024} // 50MB
             onFilesSelected={handleFilesSelected}
-            accept=".pdf,.docx,.pptx,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            multiple={true}
+            value={files}
+            disabled={isCompressing}
           />
 
-          <div className="mt-4 flex justify-center">
-            <Button
-              onClick={compressFiles}
-              disabled={files.length === 0 || isCompressing}
-              className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#6366F1] to-[#EC4899] px-8 py-3 text-base font-medium text-white transition-all duration-200 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#6366F1] focus:ring-offset-2 shadow-lg shadow-[#6366F1]/20"
-            >
-              {isCompressing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Compressing...
-                </>
-              ) : (
-                "Compress Documents"
-              )}
-            </Button>
-          </div>
-        </div>
+          {files.length > 0 && (
+            <div className="mt-6 space-y-4">
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium">Compression Level: {compressionLevel[0]}%</span>
+                  <span className="text-sm text-muted-foreground">
+                    {compressionLevel[0] < 30
+                      ? "Low (Better Quality)"
+                      : compressionLevel[0] > 70
+                        ? "High (Smaller Size)"
+                        : "Balanced"}
+                  </span>
+                </div>
+                <Slider
+                  value={compressionLevel}
+                  onValueChange={setCompressionLevel}
+                  min={10}
+                  max={90}
+                  step={10}
+                  disabled={isCompressing}
+                />
+              </div>
 
-        <div>
-          <CompressedFilesList files={compressedFiles} onDelete={handleDeleteFile} toolName="Document Compressor" />
-        </div>
-      </div>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={compressDocuments} disabled={isCompressing || files.length === 0}>
+                  {isCompressing ? "Compressing..." : "Compress Documents"}
+                </Button>
+                <Button variant="outline" onClick={clearAll} disabled={isCompressing}>
+                  Clear All
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {isCompressing && <ToolProgressIndicator className="mt-6" />}
+        </CardContent>
+      </Card>
+
+      {compressedFiles.length > 0 && <CompressedFilesList files={compressedFiles} allowDownloadAll />}
     </div>
   )
 }

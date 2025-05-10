@@ -1,94 +1,124 @@
 "use client"
 
 import { useState } from "react"
-import { FileImage, FileText, Music, FileArchive } from "lucide-react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent } from "@/components/ui/card"
+import { useRouter } from "next/navigation"
+import { FileArchive, FileImage, FileText, Music } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import Link from "next/link"
-
-const tools = [
-  {
-    id: "image",
-    label: "Image",
-    icon: FileImage,
-    accept: ".jpg,.jpeg,.png,.webp,.gif",
-    description: "Compress JPEG, PNG, WebP, and GIF images",
-    href: "/tools/image/image-compressor",
-  },
-  {
-    id: "document",
-    label: "Document",
-    icon: FileText,
-    accept: ".pdf,.docx,.pptx,.xlsx",
-    description: "Compress PDF, DOCX, PPTX, and XLSX documents",
-    href: "/tools/document/document-compressor",
-  },
-  {
-    id: "audio",
-    label: "Audio",
-    icon: Music,
-    accept: ".mp3,.wav",
-    description: "Compress MP3 and WAV audio files",
-    href: "/tools/audio/audio-compressor",
-  },
-  {
-    id: "archive",
-    label: "Archive",
-    icon: FileArchive,
-    accept: ".zip,.rar,.7z",
-    description: "Compress ZIP, RAR, and 7Z archives",
-    href: "/tools/archive/archive-compressor",
-  },
-]
+import { Card, CardContent } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export function MainTool() {
-  const [activeTab, setActiveTab] = useState("image")
+  const router = useRouter()
+  const [selectedTab, setSelectedTab] = useState("image")
 
-  const activeTool = tools.find((tool) => tool.id === activeTab)
+  const handleToolSelect = (path: string) => {
+    router.push(path)
+  }
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
-      <Card className="border-2 border-primary/10">
-        <CardContent className="p-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid grid-cols-4 mb-6">
-              {tools.map((tool) => (
-                <TabsTrigger key={tool.id} value={tool.id} className="flex flex-col items-center gap-1 py-3">
-                  <tool.icon className="h-5 w-5" />
-                  <span>{tool.label}</span>
-                </TabsTrigger>
+    <Card className="w-full max-w-3xl mx-auto">
+      <CardContent className="p-6">
+        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
+          <TabsList className="grid grid-cols-4 mb-6">
+            <TabsTrigger value="image" className="flex items-center gap-2">
+              <FileImage className="h-4 w-4" />
+              <span className="hidden sm:inline">Images</span>
+            </TabsTrigger>
+            <TabsTrigger value="document" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              <span className="hidden sm:inline">Documents</span>
+            </TabsTrigger>
+            <TabsTrigger value="audio" className="flex items-center gap-2">
+              <Music className="h-4 w-4" />
+              <span className="hidden sm:inline">Audio</span>
+            </TabsTrigger>
+            <TabsTrigger value="archive" className="flex items-center gap-2">
+              <FileArchive className="h-4 w-4" />
+              <span className="hidden sm:inline">Archives</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="image" className="mt-0">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { name: "JPEG", path: "/tools/image/jpeg-compressor" },
+                { name: "PNG", path: "/tools/image/png-compressor" },
+                { name: "WebP", path: "/tools/image/webp-compressor" },
+                { name: "All Images", path: "/tools/image/image-compressor" },
+              ].map((format) => (
+                <Button
+                  key={format.name}
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col gap-1"
+                  onClick={() => handleToolSelect(format.path)}
+                >
+                  <FileImage className="h-6 w-6 mb-1" />
+                  {format.name}
+                </Button>
               ))}
-            </TabsList>
+            </div>
+          </TabsContent>
 
-            {tools.map((tool) => (
-              <TabsContent key={tool.id} value={tool.id} className="mt-0">
-                <div className="text-center mb-6">
-                  <h3 className="text-xl font-bold">{tool.label} Compression</h3>
-                  <p className="text-muted-foreground">{tool.description}</p>
-                </div>
+          <TabsContent value="document" className="mt-0">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { name: "PDF", path: "/tools/document/pdf-compressor" },
+                { name: "DOCX", path: "/tools/document/docx-compressor" },
+                { name: "All Documents", path: "/tools/document/document-compressor" },
+              ].map((format) => (
+                <Button
+                  key={format.name}
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col gap-1"
+                  onClick={() => handleToolSelect(format.path)}
+                >
+                  <FileText className="h-6 w-6 mb-1" />
+                  {format.name}
+                </Button>
+              ))}
+            </div>
+          </TabsContent>
 
-                <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg border-gray-300 bg-white/60 backdrop-blur-sm">
-                  <div className="mb-6 text-center">
-                    <tool.icon className="h-12 w-12 mx-auto mb-4 text-primary" />
-                    <h4 className="text-lg font-medium">Ready to compress your {tool.label.toLowerCase()} files?</h4>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Our specialized {tool.label.toLowerCase()} compression tool offers the best results
-                    </p>
-                  </div>
+          <TabsContent value="audio" className="mt-0">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { name: "MP3", path: "/tools/audio/mp3-compressor" },
+                { name: "WAV", path: "/tools/audio/wav-compressor" },
+                { name: "All Audio", path: "/tools/audio/audio-compressor" },
+              ].map((format) => (
+                <Button
+                  key={format.name}
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col gap-1"
+                  onClick={() => handleToolSelect(format.path)}
+                >
+                  <Music className="h-6 w-6 mb-1" />
+                  {format.name}
+                </Button>
+              ))}
+            </div>
+          </TabsContent>
 
-                  <Button
-                    asChild
-                    className="bg-gradient-to-r from-[#6366F1] to-[#EC4899] hover:opacity-90 text-white border-0"
-                  >
-                    <Link href={tool.href}>Go to {tool.label} Compressor</Link>
-                  </Button>
-                </div>
-              </TabsContent>
-            ))}
-          </Tabs>
-        </CardContent>
-      </Card>
-    </div>
+          <TabsContent value="archive" className="mt-0">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { name: "ZIP", path: "/tools/archive/zip-compressor" },
+                { name: "All Archives", path: "/tools/archive/archive-compressor" },
+              ].map((format) => (
+                <Button
+                  key={format.name}
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col gap-1"
+                  onClick={() => handleToolSelect(format.path)}
+                >
+                  <FileArchive className="h-6 w-6 mb-1" />
+                  {format.name}
+                </Button>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
   )
 }
