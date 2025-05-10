@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { FileImage } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -25,8 +25,10 @@ export function FileUploader({
   const [files, setFiles] = useState<File[]>([])
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
+  const [shouldProcessFiles, setShouldProcessFiles] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const pendingFilesRef = useRef<FileList | null>(null)
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -42,29 +44,37 @@ export function FileUploader({
     setIsDragging(false)
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFiles(e.dataTransfer.files)
+      pendingFilesRef.current = e.dataTransfer.files
+      setShouldProcessFiles(true)
     }
   }
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      handleFiles(e.target.files)
+      pendingFilesRef.current = e.target.files
+      setShouldProcessFiles(true)
     }
   }
 
-  const handleFiles = (fileList: FileList) => {
-    const filesArray = Array.from(fileList)
-    const validFiles = filesArray.filter((file) => {
-      // Check file size
-      if (file.size > maxSize * 1024 * 1024) {
-        console.error(`File ${file.name} is too large. Maximum size is ${maxSize}MB.`)
-        return false
-      }
-      return true
-    })
+  // Process files in useEffect, not during render
+  useEffect(() => {
+    if (shouldProcessFiles && pendingFilesRef.current) {
+      const fileList = pendingFilesRef.current
+      const filesArray = Array.from(fileList)
+      const validFiles = filesArray.filter((file) => {
+        // Check file size
+        if (file.size > maxSize * 1024 * 1024) {
+          console.error(`File ${file.name} is too large. Maximum size is ${maxSize}MB.`)
+          return false
+        }
+        return true
+      })
 
-    setFiles(validFiles)
-  }
+      setFiles(validFiles)
+      setShouldProcessFiles(false)
+      pendingFilesRef.current = null
+    }
+  }, [shouldProcessFiles, maxSize])
 
   const simulateUpload = useCallback(() => {
     if (files.length === 0) return
